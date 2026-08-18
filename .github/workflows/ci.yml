@@ -1,0 +1,66 @@
+name: CI
+
+# Validation only. Runs on every push and pull request to main.
+# Deployments live in deploy-shopify-extension.yml and deploy-aws-backend.yml.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    name: Lint, typecheck and build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # npm ci requires the tracked package-lock.json and guarantees the exact
+      # dependency tree used in the container image.
+      - name: Install dependencies
+        run: npm ci
+
+      # Prisma client must exist before typecheck: app code imports its types.
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Validate Prisma schema
+        run: npx prisma validate
+        env:
+          # Not a real connection — prisma validate only needs the variable to
+          # resolve env("DATABASE_URL"). Nothing connects to a database in CI.
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Builds the widget asset the same way a release does, so a broken
+      # HOMEXPERIA_TARGET_URL or a missing injection point fails here rather
+      # than during a deploy.
+      - name: Build extension asset
+        run: npm run build:extension
+        env:
+          HOMEXPERIA_TARGET_URL: ${{ vars.HOMEXPERIA_TARGET_URL }}
+
+      - name: Build application
+        run: npm run build
+
+      # The readable widget source must never end up inside the extension
+      # bundle, and Shopify must only ever serve the minified asset.
+      - name: Check extension contains only the minified asset
+        run: |
+          if find extensions -name '*.js' -not -name '*.min.js' | grep .; then
+            echo "Readable JavaScript found inside extensions/"
+            exit 1
+          fi
+          test -f extensions/homexperia-storefront/assets/homexperia.min.js

@@ -13,5 +13,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     await db.session.deleteMany({ where: { shop } });
   }
 
+  // Removing the shop record is what stops /api/storefront-token serving this
+  // shop's credential. Shopify invalidates the app's Admin token on uninstall,
+  // so the Storefront token cannot be deleted through the API at this point —
+  // dropping our record is the control that actually revokes access.
+  // deleteMany rather than delete so a repeat delivery is not an error.
+  await db.shop.deleteMany({ where: { shop } });
+
   return new Response();
 };

@@ -9,8 +9,8 @@ generator client {
 // enough when changing adapters.
 // See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
 datasource db {
-  provider = "sqlite"
-  url      = "file:dev.sqlite"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Session {
@@ -31,4 +31,25 @@ model Session {
   emailVerified Boolean?  @default(false)
   refreshToken        String?
   refreshTokenExpires DateTime?
+}
+
+// One row per installed store, created only once a Storefront token exists.
+// The row's existence is the provisioning state, so no status column is needed.
+// Deleted on app/uninstalled, which is what stops the token API serving the shop.
+model Shop {
+  // The myshopify domain. Primary key, so reinstall upserts instead of duplicating.
+  shop String @id
+
+  // The credential the Homexperia backend fetches. This is a public-class
+  // Storefront token, never an Admin token.
+  storefrontAccessToken String
+
+  // Shopify GID of the token, required to delete the superseded token on
+  // rotation so the 100-tokens-per-shop ceiling can't creep.
+  storefrontTokenGid String
+
+  // The granted unauthenticated scopes this token was minted with, sorted and
+  // comma-joined. Compared against currently granted scopes to decide whether
+  // the token must be regenerated.
+  storefrontScopes String
 }

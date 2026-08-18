@@ -3,10 +3,12 @@
   "private": true,
   "scripts": {
     "build": "react-router build",
-    "dev": "shopify app dev",
+    "build:extension": "node scripts/build-extension.mjs",
+    "validate": "npm run lint && npm run typecheck && npm run build:extension && npm run build",
+    "dev": "npm run build:extension && shopify app dev",
     "config:link": "shopify app config link",
     "generate": "shopify app generate",
-    "deploy": "shopify app deploy",
+    "deploy": "npm run build:extension && shopify app deploy",
     "config:use": "shopify app config use",
     "env": "shopify app env",
     "start": "react-router-serve ./build/server/index.js",
@@ -41,6 +43,7 @@
   },
   "devDependencies": {
     "@shopify/api-codegen-preset": "^2.0.0",
+    "@shopify/app-bridge-types": "0.7.2",
     "@shopify/polaris-types": "1.0.1",
     "@types/eslint": "^9.6.1",
     "@types/node": "^25.5.2",
@@ -56,6 +59,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "graphql-config": "^5.1.1",
     "prettier": "^3.6.2",
+    "terser": "^5.50.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.1"
   },

@@ -7,22 +7,53 @@ embedded = true
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "write_products"
+# Unauthenticated scopes only. They are delegated to the Storefront access token
+# created by storefrontAccessTokenCreate, which is the app's sole reason for
+# calling the Admin API. No authenticated Admin scope is documented as required
+# for that mutation, so none is requested.
+#
+# Four of these five have no current consumer. They are retained deliberately so
+# that adding a nearby Storefront API capability later does not force a token
+# reprovision. Expect to justify them at App Store review.
+scopes = "unauthenticated_read_product_listings,unauthenticated_read_product_inventory,unauthenticated_read_product_tags,unauthenticated_read_product_pickup_locations,unauthenticated_read_metaobjects"
 
 [webhooks]
-api_version = "2026-10"
+api_version = "2026-07"
 
+  # Handled by: /app/routes/webhooks.app.uninstalled.tsx
   [[webhooks.subscriptions]]
   uri = "/webhooks/app/uninstalled"
   topics = [ "app/uninstalled" ]
 
+  # Handled by: /app/routes/webhooks.app.scopes_update.tsx
+  # Triggers Storefront token regeneration when granted scopes change.
   [[webhooks.subscriptions]]
   uri = "/webhooks/app/scopes_update"
   topics = [ "app/scopes_update" ]
+
+  # Mandatory compliance topics for public apps. These use `compliance_topics`,
+  # not `topics`. Missing or non-conforming handlers are an App Store rejection.
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/customers/data_request"
+  compliance_topics = [ "customers/data_request" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/customers/redact"
+  compliance_topics = [ "customers/redact" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/shop/redact"
+  compliance_topics = [ "shop/redact" ]
 
 [auth]
 redirect_urls = [ "https://example.com/api/auth" ]
 
 [build]
 include_config_on_deploy = true
-automatically_update_urls_on_dev = true
+
+# Production-safe: with one Shopify app serving real merchants, leaving this true
+# lets `shopify app dev` overwrite application_url and redirect_urls with a
+# temporary tunnel, which silently breaks OAuth for every installed store.
+# For local development against the dev store, temporarily set this to true (or
+# pass a registered --tunnel-url) and set it back before committing.
+automatically_update_urls_on_dev = false

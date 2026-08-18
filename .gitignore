@@ -16,7 +16,8 @@ database.sqlite
 .env
 .env.*
 
-package-lock.json
+# package-lock.json is intentionally tracked: the Dockerfile uses `npm ci`,
+# which requires a lockfile, and reproducible installs matter for handover.
 yarn.lock
 pnpm-lock.yaml
 

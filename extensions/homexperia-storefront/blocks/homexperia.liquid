@@ -1,0 +1,71 @@
+{%- liquid
+  assign entries = ''
+
+  if block.settings.button_text != blank
+    assign value = block.settings.button_text | json
+    assign entries = entries | append: ',"buttonText":' | append: value
+  endif
+
+  if block.settings.modal_title != blank
+    assign value = block.settings.modal_title | json
+    assign entries = entries | append: ',"modalTitle":' | append: value
+  endif
+
+  if block.settings.placement_selector != blank
+    assign value = block.settings.placement_selector | json
+    assign entries = entries | append: ',"placementSelector":' | append: value
+  endif
+
+  if block.settings.placement_mode != blank
+    assign value = block.settings.placement_mode | json
+    assign entries = entries | append: ',"placementMode":' | append: value
+  endif
+
+  assign entries = entries | remove_first: ','
+  assign homexperia_config = '{' | append: entries | append: '}'
+-%}
+<script type="application/json" id="homexperia-extension-config">{{ homexperia_config }}</script>
+
+{% schema %}
+{
+  "name": "t:homexperia.block.name",
+  "target": "body",
+  "javascript": "homexperia.min.js",
+  "enabled_on": {
+    "templates": ["product"]
+  },
+  "settings": [
+    {
+      "type": "text",
+      "id": "button_text",
+      "label": "t:homexperia.button_text.label",
+      "default": "View in Your Room"
+    },
+    {
+      "type": "text",
+      "id": "modal_title",
+      "label": "t:homexperia.modal_title.label",
+      "default": "Homexperia AI"
+    },
+    {
+      "type": "text",
+      "id": "placement_selector",
+      "label": "t:homexperia.placement_selector.label",
+      "info": "t:homexperia.placement_selector.info",
+      "default": "form[action*=\"/cart/add\"]"
+    },
+    {
+      "type": "select",
+      "id": "placement_mode",
+      "label": "t:homexperia.placement_mode.label",
+      "info": "t:homexperia.placement_mode.info",
+      "options": [
+        { "value": "before", "label": "t:homexperia.placement_mode.option_before" },
+        { "value": "after", "label": "t:homexperia.placement_mode.option_after" },
+        { "value": "inside", "label": "t:homexperia.placement_mode.option_inside" }
+      ],
+      "default": "after"
+    }
+  ]
+}
+{% endschema %}

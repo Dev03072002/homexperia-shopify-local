@@ -1,0 +1,24 @@
+{
+  "homexperia": {
+    "block": {
+      "name": "View in Your Room"
+    },
+    "button_text": {
+      "label": "Button text"
+    },
+    "modal_title": {
+      "label": "Window title"
+    },
+    "placement_selector": {
+      "label": "Button placement target",
+      "info": "CSS selector for the element the button is added to. The default targets your theme's add to cart form. Leave blank to use the default."
+    },
+    "placement_mode": {
+      "label": "Button placement",
+      "info": "Where the button appears relative to the placement target.",
+      "option_before": "Before target",
+      "option_after": "After target",
+      "option_inside": "Inside target"
+    }
+  }
+}
