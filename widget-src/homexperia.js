@@ -3,7 +3,11 @@
   window.__homexperiaLoaded = true;
 
   const DEFAULT_CONFIG = {
-    targetUrl: "https://dev.homexperia.com",
+    // Base URL only. The shop domain, product GID and variant are appended at
+    // modal-open time to form the Homexperia contract:
+    //   {targetUrl}/{shop}?productId={gid}&shop={shop}&variant={id}
+    // Overridden at build time by HOMEXPERIA_TARGET_URL.
+    targetUrl: "https://ai.homexperia.com/shopify-room-upload",
     buttonText: "View in Your Room",
     modalTitle: "Homexperia AI",
     placementSelector: 'form[action*="/cart/add"]',
@@ -11,6 +15,71 @@
   };
 
   let CONFIG = DEFAULT_CONFIG;
+
+  // Selectors that mark a variant swatch as the chosen one. Horizon-style
+  // pickers expose the variant on the element itself via data-variant-id.
+  const SELECTED_VARIANT_SELECTORS = [
+    'input[data-variant-id]:checked',
+    '[data-variant-id][aria-checked="true"]',
+    '[data-variant-id][aria-selected="true"]',
+    '[data-variant-id][data-selected="true"]',
+    'option[data-variant-id]:checked'
+  ].join(",");
+
+  // Resolved fresh each time the modal opens rather than tracked continuously,
+  // so no observer is needed: whatever the shopper has selected at click time is
+  // what gets sent.
+  function currentVariantId() {
+    const selected = document.querySelector(SELECTED_VARIANT_SELECTORS);
+    if (selected) {
+      const id = selected.getAttribute("data-variant-id");
+      if (id) return id;
+    }
+
+    // Classic themes keep the selected variant in the add-to-cart form, which
+    // they update on every variant change.
+    const formInput = document.querySelector(
+      'form[action*="/cart/add"] [name="id"]'
+    );
+    if (formInput && formInput.value) return formInput.value;
+
+    // Most themes also mirror the selection into the URL.
+    try {
+      const fromUrl = new URLSearchParams(window.location.search).get("variant");
+      if (fromUrl) return fromUrl;
+    } catch (error) {
+      // Ignore and fall through to the value Liquid rendered.
+    }
+
+    // Rendered by the app embed at page load.
+    return CONFIG.variantId || "";
+  }
+
+  // Builds the Homexperia URL:
+  //   {targetUrl}/{shop}?productId={gid}&shop={shop}&variant={id}
+  // Falls back to the bare target URL if the storefront context is missing, so
+  // a theme that does not expose it still opens the experience.
+  function buildTargetUrl() {
+    const base = String(CONFIG.targetUrl || "").replace(/\/+$/, "");
+    const shopDomain = CONFIG.shopDomain || window.location.hostname;
+
+    if (!base || !shopDomain) return CONFIG.targetUrl;
+
+    try {
+      const url = new URL(base + "/" + encodeURIComponent(shopDomain));
+      const productGid = CONFIG.productGid;
+      const variantId = currentVariantId();
+
+      if (productGid) url.searchParams.set("productId", productGid);
+      url.searchParams.set("shop", shopDomain);
+      if (variantId) url.searchParams.set("variant", variantId);
+
+      return url.toString();
+    } catch (error) {
+      console.warn("[Homexperia] Could not build the target URL.", error);
+      return CONFIG.targetUrl;
+    }
+  }
 
   function readExtensionConfig() {
     const node = document.getElementById("homexperia-extension-config");
@@ -164,7 +233,7 @@
     const modal = document.getElementById("homexperia-modal");
     const iframe = document.getElementById("homexperia-iframe");
 
-    let url = CONFIG.targetUrl;
+    let url = buildTargetUrl();
 
     iframe.src = url;
     modal.classList.add("active");

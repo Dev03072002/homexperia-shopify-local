@@ -11,7 +11,7 @@
 # CLI commands that must resolve the app (config validate, dev, deploy) need a
 # Client ID from one of those two sources.
 
-name = "homexperia-app"
+name = "Homexperia Room Visualisation"
 application_url = "https://shopify.homexperia.com"
 embedded = true
 

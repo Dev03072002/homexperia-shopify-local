@@ -85,6 +85,23 @@ Read from the code, not assumed.
 | --- | --- |
 | `HOMEXPERIA_TARGET_URL` | Compiled into the extension asset and served by Shopify's CDN. Setting it on the server has no effect; changing it requires re-running the Shopify release. |
 
+Production value is the **common base URL only**:
+
+```
+HOMEXPERIA_TARGET_URL=https://ai.homexperia.com/shopify-room-upload
+```
+
+No merchant domain belongs in it. The extension appends the storefront context
+itself at the moment the modal opens:
+
+```
+{HOMEXPERIA_TARGET_URL}/{shop}?productId={product_gid}&shop={shop}&variant={variant_id}
+```
+
+`shop` comes from Liquid `shop.domain` (the merchant's primary domain), the
+product GID from Liquid `product.id`, and the variant from the shopper's current
+selection. Merchants add no JavaScript to their theme.
+
 ### Not used in production
 
 `SHOP_CUSTOM_DOMAIN` and `FRONTEND_PORT` are development-only. Leave unset.

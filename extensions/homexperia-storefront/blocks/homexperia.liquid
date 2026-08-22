@@ -21,6 +21,19 @@
     assign entries = entries | append: ',"placementMode":' | append: value
   endif
 
+  assign shop_domain = shop.domain | json
+  assign entries = entries | append: ',"shopDomain":' | append: shop_domain
+
+  if product
+    assign product_gid = 'gid://shopify/Product/' | append: product.id | json
+    assign entries = entries | append: ',"productGid":' | append: product_gid
+
+    if product.selected_or_first_available_variant
+      assign variant_id = '' | append: product.selected_or_first_available_variant.id | json
+      assign entries = entries | append: ',"variantId":' | append: variant_id
+    endif
+  endif
+
   assign entries = entries | remove_first: ','
   assign homexperia_config = '{' | append: entries | append: '}'
 -%}
