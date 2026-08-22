@@ -1,8 +1,18 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+#
+# This shared configuration carries no client_id on purpose, so the repository
+# is not tied to any one developer's Shopify app.
+#
+#   Production : Jenkins supplies SHOPIFY_FLAG_CLIENT_ID (equivalent to
+#                `shopify app deploy --client-id`) for the release stage.
+#   Local dev  : create a personal, gitignored shopify.app.<name>.toml via
+#                `shopify app config link`, then `shopify app config use <name>`.
+#
+# CLI commands that must resolve the app (config validate, dev, deploy) need a
+# Client ID from one of those two sources.
 
-client_id = "1bb55de153d088e954c02265ef8d34ea"
 name = "homexperia-app"
-application_url = "https://example.com"
+application_url = "https://shopify.homexperia.com"
 embedded = true
 
 [access_scopes]
@@ -46,7 +56,10 @@ api_version = "2026-07"
   compliance_topics = [ "shop/redact" ]
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+# Path matches authPathPrefix "/auth" in app/shopify.server.ts, which the splat
+# route app/routes/auth.$.tsx serves. The template default was /api/auth, which
+# no route in this app serves.
+redirect_urls = [ "https://shopify.homexperia.com/auth/callback" ]
 
 [build]
 include_config_on_deploy = true

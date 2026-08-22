@@ -96,7 +96,8 @@ Credentials Store (secret text):
 | ID | Contains |
 | --- | --- |
 | `homexperia-target-url` | `HOMEXPERIA_TARGET_URL` for the extension build |
-| `shopify-app-automation-token` | App Automation Token — **pending**, created in the Dev Dashboard once the production Shopify app exists |
+| `shopify-app-automation-token` | App Automation Token — **pending** |
+| `shopify-app-client-id` | Production Shopify Client ID — **pending**. Injected as `SHOPIFY_FLAG_CLIENT_ID`, which overrides the development `client_id` in `shopify.app.toml`, so the production ID is never committed |
 
 The runtime secrets (`SHOPIFY_API_SECRET`, `DATABASE_URL`,
 `HOMEXPERIA_API_SECRET`) are consumed by the container through the env file, not
@@ -203,26 +204,39 @@ Prisma migrations are forward-only, so check the migration before relying on it.
 
 ## Pending: production Shopify app
 
-The production Shopify app does not exist yet. `shopify.app.toml` still holds
-the development app's `client_id` and `https://example.com` URLs. Once the app
-is created in the Dev Dashboard:
+The production Shopify app does not exist yet. `application_url` and
+`redirect_urls` are already set to the production domain and need no further
+edit. `client_id` in `shopify.app.toml` is still the development app's, and is
+overridden at release time by `SHOPIFY_FLAG_CLIENT_ID`.
 
-1. Link the repository to it and set `application_url` and `redirect_urls` to
-   `https://shopify.homexperia.com`.
-2. Put the production client ID in `SHOPIFY_API_KEY` and the client secret in
-   `SHOPIFY_API_SECRET`.
-3. Generate an App Automation Token and store it as
-   `shopify-app-automation-token`.
-4. Run the pipeline once with `RELEASE_SHOPIFY` enabled.
+Once the app is created in the Dev Dashboard, **no Git change is required** —
+add these to the Credentials Store:
+
+1. `shopify-app-client-id` — production Client ID.
+2. `shopify-app-automation-token` — App Automation Token.
+3. Production Client ID into `SHOPIFY_API_KEY` and Client Secret into
+   `SHOPIFY_API_SECRET` in the runtime env file.
+4. `homexperia-target-url` — final Homexperia experience URL.
+
+Then run the pipeline once with `RELEASE_SHOPIFY` enabled to publish the
+extension and app configuration to the production app.
 
 ## Local development
+
+The tracked `shopify.app.toml` deliberately has **no `client_id`**, so the
+repository is not tied to any one developer's Shopify app. Create your own
+configuration once — it is gitignored:
 
 ```bash
 npm ci
 npx prisma generate
+
+shopify app config link          # writes shopify.app.<name>.toml
+shopify app config use <name>
 npm run dev
 ```
 
-`shopify.app.toml` ships with `automatically_update_urls_on_dev = false` so local
-development cannot overwrite the production app URLs. To run `shopify app dev`,
-set it to `true` temporarily and change it back before committing.
+`shopify.app.*.toml` is gitignored, so your Client ID and any tunnel URLs stay
+local. The shared config keeps `automatically_update_urls_on_dev = false` so
+nothing local can overwrite the production URLs; set it to `true` in your own
+config instead.

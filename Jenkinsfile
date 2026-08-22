@@ -111,10 +111,16 @@ pipeline {
       when { expression { return params.RELEASE_SHOPIFY } }
       steps {
         // PENDING: requires the production Shopify app, which does not exist
-        // yet. Configure 'shopify-app-automation-token' in the Credentials
-        // Store once the app is created in the Dev Dashboard.
+        // yet. Configure these credentials once it is created in the Dev
+        // Dashboard.
+        //
+        // SHOPIFY_FLAG_CLIENT_ID overrides the client_id committed in
+        // shopify.app.toml, which is still the development app. Supplying it
+        // here means the production Client ID never has to be committed, and
+        // a release cannot accidentally publish to the development app.
         withCredentials([
           string(credentialsId: 'shopify-app-automation-token', variable: 'SHOPIFY_APP_AUTOMATION_TOKEN'),
+          string(credentialsId: 'shopify-app-client-id', variable: 'SHOPIFY_FLAG_CLIENT_ID'),
           string(credentialsId: 'homexperia-target-url', variable: 'HOMEXPERIA_TARGET_URL')
         ]) {
           sh 'npm run build:extension'
