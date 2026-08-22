@@ -12,6 +12,7 @@
 # Client ID from one of those two sources.
 
 name = "Homexperia Room Visualisation"
+handle = "homexperia-room-visualisation"
 application_url = "https://shopify.homexperia.com"
 embedded = true
 
