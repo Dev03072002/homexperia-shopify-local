@@ -1,3 +1,15 @@
 .cache
 build
 node_modules
+
+# Never let local secrets or git history enter the image.
+.env
+.env.*
+.git
+.github
+.shopify
+
+# Not needed at runtime.
+Jenkinsfile
+DEPLOYMENT.md
+deploy

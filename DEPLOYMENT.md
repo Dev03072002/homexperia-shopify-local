@@ -1,70 +1,219 @@
 # Deployment
 
-Two independent deploy targets. The theme app extension is hosted by Shopify's
-CDN; the application backend runs on AWS. They are released separately.
+Production architecture:
 
 ```
-                    ┌─ .github/workflows/deploy-shopify-extension.yml
-git push / release ─┤     build homexperia.min.js  →  shopify app deploy  →  Shopify CDN
-                    │
-                    └─ .github/workflows/deploy-aws-backend.yml
-                          docker build  →  Amazon ECR  →  AWS runtime
+Git repository
+      ↓
+Jenkins  (validation, build, Docker build)
+      ↓
+deploy/deploy.sh  →  migrate  →  replace container  →  health check
+      ↓
+Docker (host networking) on EC2
+      ↓                    ↓
+PostgreSQL 127.0.0.1:5432  app on 127.0.0.1:3000
+                                 ↓
+                           Nginx  →  https://shopify.homexperia.com
 ```
 
-`.github/workflows/ci.yml` runs lint, typecheck and both builds on every push
-and pull request to `main`.
+Jenkins is the only production deployment mechanism. GitHub Actions runs
+pull-request validation only and cannot deploy or publish anything.
+
+## Known paths
+
+| | |
+| --- | --- |
+| Application directory | `/home/sopify/app` |
+| Runtime env file | `/home/sopify/.config/homexperia-shopify/app.env` |
+| Database | `homexperia_shopify` |
+| Runtime DB role | `homexperia_shopify_app` (owner, not superuser) |
+| DB address from the container | `127.0.0.1:5432` (host networking) |
+| Container name | `homexperia-shopify-app` |
+| Nginx upstream | `http://127.0.0.1:3000` |
+
+The runtime env file sits outside `/home/sopify/app` on purpose: a Jenkins
+checkout or redeploy of the application directory can never overwrite or expose
+it.
+
+## Docker networking
+
+The container runs with `--network host`.
+
+PostgreSQL listens only on `127.0.0.1:5432`, which is correct and must not
+change. A bridge-network container cannot reach it: `127.0.0.1` inside a bridge
+container is the container itself, and the bridge gateway address is not one
+PostgreSQL is listening on. Reaching it from a bridge network would require
+opening `listen_addresses`, which would weaken a currently sound configuration.
+
+Host networking removes the boundary instead of widening PostgreSQL's exposure,
+which is why it is the right trade on a single-host deployment.
+
+Because host networking means the app binds directly to a host interface,
+**`HOST=127.0.0.1` matters**. Without it the app would listen on `0.0.0.0` and
+port 3000 would be reachable on the EC2 network interface, bypassing Nginx and
+TLS. `react-router-serve` binds to `process.env.HOST` when set.
+
+Port 3000 is free on this host; 5173, 8080, 5432, 80 and 443 belong to the
+existing Homexperia application and Nginx and are untouched.
 
 ## Environment variables
 
-| Variable | Where | Secret | Notes |
-| --- | --- | --- | --- |
-| `SHOPIFY_API_KEY` | AWS runtime | no | Public client ID |
-| `SHOPIFY_API_SECRET` | AWS runtime | **yes** | Secrets Manager |
-| `SHOPIFY_APP_URL` | AWS runtime | no | Must match `application_url` in `shopify.app.toml` |
-| `SCOPES` | AWS runtime | no | Must match `shopify.app.toml` |
-| `DATABASE_URL` | AWS runtime | **yes** | RDS PostgreSQL connection string |
-| `HOMEXPERIA_API_SECRET` | AWS runtime | **yes** | Shared secret for `POST /api/storefront-token` |
-| `HOMEXPERIA_TARGET_URL` | **CI build only** | no | Compiled into the extension asset |
+Read from the code, not assumed.
 
-`HOMEXPERIA_TARGET_URL` is not an AWS runtime variable. It is injected into
-`homexperia.min.js` at build time and served from Shopify's CDN, so changing it
-requires re-running the extension deploy. Setting it in AWS has no effect.
+### Runtime — non-secret
 
-## GitHub configuration
+| Variable | Value | Source |
+| --- | --- | --- |
+| `SHOPIFY_API_KEY` | client ID | Shopify production app — **pending** |
+| `SHOPIFY_APP_URL` | `https://shopify.homexperia.com` | fixed |
+| `SCOPES` | must match `shopify.app.toml` | repository |
+| `NODE_ENV` | `production` | fixed |
+| `HOST` | `127.0.0.1` | fixed — see above |
+| `PORT` | `3000` | fixed |
 
-Repository **secrets**:
+### Runtime — secret (Jenkins Credentials Store)
 
-- `SHOPIFY_APP_AUTOMATION_TOKEN` — App Automation Token, generated in the Dev
-  Dashboard under Settings. This replaced Partner CLI tokens.
-- `AWS_DEPLOY_ROLE_ARN` — IAM role assumed via GitHub OIDC. No static AWS keys.
+| Variable | Source |
+| --- | --- |
+| `SHOPIFY_API_SECRET` | Shopify production app — **pending** |
+| `DATABASE_URL` | `postgresql://homexperia_shopify_app:PASSWORD@127.0.0.1:5432/homexperia_shopify` |
+| `HOMEXPERIA_API_SECRET` | Homexperia — shared with their backend team |
 
-Repository **variables**:
+### Build-time only — never in the runtime env file
 
-- `HOMEXPERIA_TARGET_URL`
-- `AWS_REGION`
-- `ECR_REPOSITORY`
-- `AWS_RUNTIME` — `ecs` or `apprunner`. While unset, the image is built and
-  pushed but no rollout happens.
-- `ECS_CLUSTER` + `ECS_SERVICE`, or `APPRUNNER_SERVICE_ARN`
+| Variable | Notes |
+| --- | --- |
+| `HOMEXPERIA_TARGET_URL` | Compiled into the extension asset and served by Shopify's CDN. Setting it on the server has no effect; changing it requires re-running the Shopify release. |
 
-## Database migrations
+### Not used in production
 
-Migrations run when the container starts (`npm run docker-start` →
-`prisma migrate deploy`), not from CI, because RDS normally sits in a private
-subnet the runners cannot reach. Prisma takes an advisory lock, so parallel task
-starts are safe.
+`SHOP_CUSTOM_DOMAIN` and `FRONTEND_PORT` are development-only. Leave unset.
 
-The initial migration is `prisma/migrations/0_init` and targets PostgreSQL.
+## Jenkins configuration
 
-## Releasing
+Credentials Store (secret text):
 
-- **Backend**: push to `main`. CI validates, then the backend workflow builds and
-  rolls out.
-- **Extension / app version**: publish a GitHub Release, or run
-  *Deploy Shopify extension* manually. This replaces the active app version for
-  every merchant, so it is intentionally not automatic on push. The manual run
-  offers a "release" toggle; turning it off creates the version without serving
-  it, for release from the Dev Dashboard later.
+| ID | Contains |
+| --- | --- |
+| `homexperia-target-url` | `HOMEXPERIA_TARGET_URL` for the extension build |
+| `shopify-app-automation-token` | App Automation Token — **pending**, created in the Dev Dashboard once the production Shopify app exists |
+
+The runtime secrets (`SHOPIFY_API_SECRET`, `DATABASE_URL`,
+`HOMEXPERIA_API_SECRET`) are consumed by the container through the env file, not
+by the pipeline. Add them to the Credentials Store and have the job that
+provisions the env file write them, or provision the file out of band.
+
+### Creating the runtime env file from Jenkins
+
+`deploy/app.env.example` is the template. To generate it from credentials:
+
+```groovy
+withCredentials([
+  string(credentialsId: 'shopify-api-secret',     variable: 'SHOPIFY_API_SECRET'),
+  string(credentialsId: 'shopify-database-url',   variable: 'DATABASE_URL'),
+  string(credentialsId: 'homexperia-api-secret',  variable: 'HOMEXPERIA_API_SECRET')
+]) {
+  sh '''
+    umask 077
+    TMP="$(mktemp)"
+    trap 'rm -f "$TMP"' EXIT
+    {
+      echo "SHOPIFY_API_KEY=..."
+      echo "SHOPIFY_APP_URL=https://shopify.homexperia.com"
+      echo "SCOPES=..."
+      echo "NODE_ENV=production"
+      echo "HOST=127.0.0.1"
+      echo "PORT=3000"
+      echo "SHOPIFY_API_SECRET=$SHOPIFY_API_SECRET"
+      echo "DATABASE_URL=$DATABASE_URL"
+      echo "HOMEXPERIA_API_SECRET=$HOMEXPERIA_API_SECRET"
+    } > "$TMP"
+    install -m 600 "$TMP" /home/sopify/.config/homexperia-shopify/app.env
+  '''
+}
+```
+
+`umask 077` means the temp file is never briefly world-readable, `trap` removes
+it even on failure, and `install -m 600` sets the final permissions atomically.
+`deploy.sh` refuses to run if the file is not mode 600 or 400.
+
+Never echo these values, never pass them as `docker build --build-arg`, and
+never write them into `/home/sopify/app`.
+
+## Pipeline stages
+
+| Stage | Runs when |
+| --- | --- |
+| Checkout | always |
+| Install (`npm ci`) | always |
+| Validate (prisma generate/validate, lint, typecheck) | always |
+| Build (extension + application, bundle guard) | always |
+| Docker build | `DEPLOY_BACKEND` |
+| Deploy backend (`deploy/deploy.sh`) | `DEPLOY_BACKEND` |
+| Release Shopify extension | `RELEASE_SHOPIFY` — **off by default** |
+
+`RELEASE_SHOPIFY` publishes a new app version to every merchant with the app
+installed. Backend-only changes must leave it off.
+
+## Deployment sequence
+
+`deploy/deploy.sh <tag>` performs, in order:
+
+1. Verify the runtime env file exists and is mode 600/400.
+2. `docker build`.
+3. **Migrate** — `prisma migrate deploy` in a one-off `--rm` container with host
+   networking. If it fails the script exits and the running revision is
+   untouched.
+4. Stop the current container and rename it to `homexperia-shopify-app-previous`.
+5. Start the new container with `--restart unless-stopped`.
+6. Poll `http://127.0.0.1:3000/healthz` (30 attempts, 2s apart).
+7. On failure: print the last 50 log lines, remove the new container, restore
+   the previous one, exit non-zero.
+
+Migrations run before the swap rather than at container start, so a bad
+migration fails the deployment instead of crash-looping the container.
+
+Only resources named `homexperia-shopify-app*` are touched. No `docker system
+prune`, no unrelated containers, images, or services.
+
+### Manual commands
+
+```bash
+cd /home/sopify/app
+
+./deploy/deploy.sh                      # build, migrate, deploy, verify
+./deploy/rollback.sh                    # restore previous container
+
+docker logs -f homexperia-shopify-app   # follow logs
+docker ps --filter name=homexperia-shopify-app
+curl -fsS http://127.0.0.1:3000/healthz
+```
+
+Rollback restores the previous image. It does **not** revert migrations —
+Prisma migrations are forward-only, so check the migration before relying on it.
+
+## Handed to the AWS team
+
+- Nginx site for `shopify.homexperia.com` proxying to `http://127.0.0.1:3000`.
+  Do not modify the existing `cms.homexperia.com` site.
+- TLS via Certbot for the new host.
+- How the Deploy stage reaches EC2: run the job on an agent on the host, or wrap
+  `deploy/deploy.sh` in your own transport. The repository does not assume one.
+- Creating `/home/sopify/.config/homexperia-shopify/app.env` with mode 600.
+
+## Pending: production Shopify app
+
+The production Shopify app does not exist yet. `shopify.app.toml` still holds
+the development app's `client_id` and `https://example.com` URLs. Once the app
+is created in the Dev Dashboard:
+
+1. Link the repository to it and set `application_url` and `redirect_urls` to
+   `https://shopify.homexperia.com`.
+2. Put the production client ID in `SHOPIFY_API_KEY` and the client secret in
+   `SHOPIFY_API_SECRET`.
+3. Generate an App Automation Token and store it as
+   `shopify-app-automation-token`.
+4. Run the pipeline once with `RELEASE_SHOPIFY` enabled.
 
 ## Local development
 
@@ -75,6 +224,5 @@ npm run dev
 ```
 
 `shopify.app.toml` ships with `automatically_update_urls_on_dev = false` so local
-development cannot overwrite the production app URLs. To run `shopify app dev`
-against the dev store, set it to `true` temporarily and change it back before
-committing.
+development cannot overwrite the production app URLs. To run `shopify app dev`,
+set it to `true` temporarily and change it back before committing.
