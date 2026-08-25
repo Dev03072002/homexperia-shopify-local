@@ -11,7 +11,12 @@
 # application, its database, Nginx, or PostgreSQL.
 #
 # Usage (from the application directory, normally /home/sopify/app):
-#   ./deploy/deploy.sh <image-tag>
+#   ./deploy/deploy.sh <full-ecr-image-ref>
+#
+# The image is pulled from ECR, not built here — Jenkins builds and pushes it
+# once in the "Docker build & push" stage, so what was validated in CI is
+# exactly what gets deployed. For a manual/local run, build and push the image
+# yourself first, or pass a locally-built tag if you don't need ECR.
 #
 # Environment:
 #   APP_ENV_FILE  runtime env file (default /home/sopify/.config/homexperia-shopify/app.env)
@@ -19,10 +24,8 @@
 
 set -euo pipefail
 
-IMAGE_NAME="homexperia-shopify-app"
 CONTAINER_NAME="homexperia-shopify-app"
-IMAGE_TAG="${1:-$(git rev-parse --short HEAD 2>/dev/null || echo manual)}"
-IMAGE="${IMAGE_NAME}:${IMAGE_TAG}"
+IMAGE="${1:?Usage: deploy.sh <full-ecr-image-ref>}"
 
 APP_ENV_FILE="${APP_ENV_FILE:-/home/sopify/.config/homexperia-shopify/app.env}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3000/healthz}"
@@ -42,9 +45,24 @@ case "$PERMS" in
   *) fail "$APP_ENV_FILE has permissions $PERMS; expected 600." ;;
 esac
 
-# ---------------------------------------------------------------- build
-log "Building ${IMAGE}"
-docker build -t "$IMAGE" -t "${IMAGE_NAME}:current" .
+# ---------------------------------------------------------------- pull
+# If IMAGE is an ECR reference, log in using this host's own IAM instance
+# role (pull-only — it cannot push). aws/docker pick up instance credentials
+# automatically; nothing is stored on disk for this.
+case "$IMAGE" in
+  *.dkr.ecr.*.amazonaws.com/*)
+    REGISTRY="${IMAGE%%/*}"
+    REGION="$(printf '%s' "$REGISTRY" | cut -d. -f4)"
+    log "Authenticating to ECR (${REGISTRY})"
+    aws ecr get-login-password --region "$REGION" \
+      | docker login --username AWS --password-stdin "$REGISTRY" \
+      || fail "ECR login failed."
+    ;;
+esac
+
+log "Pulling ${IMAGE}"
+docker pull "$IMAGE"
+docker tag "$IMAGE" "${CONTAINER_NAME}:current"
 
 # ------------------------------------------------------------ migrate
 # Host networking so the container can reach PostgreSQL on 127.0.0.1:5432,
