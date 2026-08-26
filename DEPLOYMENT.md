@@ -66,7 +66,7 @@ Read from the code, not assumed.
 | --- | --- | --- |
 | `SHOPIFY_API_KEY` | client ID | Shopify production app — **pending** |
 | `SHOPIFY_APP_URL` | `https://shopify.homexperia.com` | fixed |
-| `SCOPES` | must match `shopify.app.toml` | repository |
+| `SCOPES` | must match `shopify.app.production.toml` | repository |
 | `NODE_ENV` | `production` | fixed |
 | `HOST` | `127.0.0.1` | fixed — see above |
 | `PORT` | `3000` | fixed |
@@ -114,7 +114,6 @@ Credentials Store (secret text):
 | --- | --- |
 | `homexperia-target-url` | `HOMEXPERIA_TARGET_URL` for the extension build |
 | `shopify-app-automation-token` | App Automation Token — **pending** |
-| `shopify-app-client-id` | Production Shopify Client ID — **pending**. Injected as `SHOPIFY_FLAG_CLIENT_ID`, which overrides the development `client_id` in `shopify.app.toml`, so the production ID is never committed |
 
 The runtime secrets (`SHOPIFY_API_SECRET`, `DATABASE_URL`,
 `HOMEXPERIA_API_SECRET`) are consumed by the container through the env file, not
@@ -219,30 +218,28 @@ Prisma migrations are forward-only, so check the migration before relying on it.
   `deploy/deploy.sh` in your own transport. The repository does not assume one.
 - Creating `/home/sopify/.config/homexperia-shopify/app.env` with mode 600.
 
-## Pending: production Shopify app
+## Shopify app configuration
 
-The production Shopify app does not exist yet. `application_url` and
-`redirect_urls` are already set to the production domain and need no further
-edit. `client_id` in `shopify.app.toml` is still the development app's, and is
-overridden at release time by `SHOPIFY_FLAG_CLIENT_ID`.
+`shopify.app.production.toml` is the tracked production source of truth, and
+the release stage names it explicitly with `--config production`. There is no
+default `shopify.app.toml` in the repository, so no command can fall back to an
+unqualified config.
 
-Once the app is created in the Dev Dashboard, **no Git change is required** —
-add these to the Credentials Store:
+Its `client_id` **is committed on purpose**. Shopify documents `client_id` as
+"the app's public identifier" — the same value served to browsers as
+`SHOPIFY_API_KEY` — and it is a required field. Leaving it out previously made
+the CLI treat the config as unlinked, so `shopify app deploy` first ran
+`app config link`, which "pulls app configuration from the Developer Dashboard
+and creates or overwrites a configuration file". That overwrote the workspace
+config with Dashboard defaults and released those instead of ours.
 
-1. `shopify-app-client-id` — production Client ID.
-2. `shopify-app-automation-token` — App Automation Token.
-3. Production Client ID into `SHOPIFY_API_KEY` and Client Secret into
-   `SHOPIFY_API_SECRET` in the runtime env file.
-4. `homexperia-target-url` — final Homexperia experience URL.
-
-Then run the pipeline once with `RELEASE_SHOPIFY` enabled to publish the
-extension and app configuration to the production app.
+The **Client Secret** and the **App Automation Token** remain secret and stay
+out of Git.
 
 ## Local development
 
-The tracked `shopify.app.toml` deliberately has **no `client_id`**, so the
-repository is not tied to any one developer's Shopify app. Create your own
-configuration once — it is gitignored:
+Local work uses your own gitignored config, so the repository is never tied to
+one developer's Shopify app. Create it once:
 
 ```bash
 npm ci
@@ -253,7 +250,8 @@ shopify app config use <name>
 npm run dev
 ```
 
-`shopify.app.*.toml` is gitignored, so your Client ID and any tunnel URLs stay
-local. The shared config keeps `automatically_update_urls_on_dev = false` so
-nothing local can overwrite the production URLs; set it to `true` in your own
-config instead.
+`shopify.app.*.toml` is gitignored apart from the production config, so your
+Client ID and any tunnel URLs stay local. Never pass `--config production` to
+`shopify app dev`: that config keeps `automatically_update_urls_on_dev = false`
+precisely so nothing local can overwrite the production URLs. Set `true` in your
+own config instead.

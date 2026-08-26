@@ -1,0 +1,64 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+#
+# LOCAL ONLY — gitignored. Linked to the real Homexperia production Shopify app.
+# Use for interactive CLI work against production:
+#   shopify app config use production
+#
+# Jenkins releases do NOT use this file. They use the tracked shopify.app.toml
+# with the Client ID supplied externally via SHOPIFY_FLAG_CLIENT_ID.
+
+name = "Homexperia Room Visualisation"
+handle = "homexperia-room-visualisation"
+client_id = "3a2e564ef8597b0c509b6cb60d7b1954"
+application_url = "https://shopify.homexperia.com"
+embedded = true
+
+[access_scopes]
+# Must stay byte-identical to the tracked shopify.app.toml and to the SCOPES
+# runtime variable. app/shopify.server.ts splits SCOPES on "," without trimming.
+scopes = "unauthenticated_read_product_listings,unauthenticated_read_product_inventory,unauthenticated_read_product_tags,unauthenticated_read_product_pickup_locations,unauthenticated_read_metaobjects"
+
+[webhooks]
+# 2026-07 matches ApiVersion.July26 in app/shopify.server.ts. Keeping the
+# webhook serialization version aligned with the Admin API client avoids
+# payloads arriving in a shape the handlers were not written against.
+api_version = "2026-07"
+
+  # Handled by: /app/routes/webhooks.app.uninstalled.tsx
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/uninstalled"
+  topics = [ "app/uninstalled" ]
+
+  # Handled by: /app/routes/webhooks.app.scopes_update.tsx
+  # Triggers Storefront token regeneration when granted scopes change.
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/scopes_update"
+  topics = [ "app/scopes_update" ]
+
+  # Mandatory compliance topics for public apps. These use `compliance_topics`,
+  # not `topics`. Missing or non-conforming handlers are an App Store rejection.
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/customers/data_request"
+  compliance_topics = [ "customers/data_request" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/customers/redact"
+  compliance_topics = [ "customers/redact" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/shop/redact"
+  compliance_topics = [ "shop/redact" ]
+
+[auth]
+# Path matches authPathPrefix "/auth" in app/shopify.server.ts, served by the
+# splat route app/routes/auth.$.tsx.
+redirect_urls = [ "https://shopify.homexperia.com/auth/callback" ]
+
+[build]
+include_config_on_deploy = true
+
+# Critical for this file: it points at the REAL production app. If this were
+# true, running `shopify app dev --config production` would overwrite the
+# production application_url and redirect_urls with a temporary tunnel and break
+# OAuth for every installed merchant.
+automatically_update_urls_on_dev = false

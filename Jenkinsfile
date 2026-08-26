@@ -110,25 +110,27 @@ pipeline {
     stage('Release Shopify extension') {
       when { expression { return params.RELEASE_SHOPIFY } }
       steps {
-        // PENDING: requires the production Shopify app, which does not exist
-        // yet. Configure these credentials once it is created in the Dev
-        // Dashboard.
+        // Deploys shopify.app.production.toml, which is tracked and already
+        // carries the production client_id. Because that config is linked, the
+        // CLI never runs `app config link` — the step that previously pulled
+        // the Dev Dashboard's default values over the workspace config and
+        // released them.
         //
-        // SHOPIFY_FLAG_CLIENT_ID overrides the client_id committed in
-        // shopify.app.toml, which is still the development app. Supplying it
-        // here means the production Client ID never has to be committed, and
-        // a release cannot accidentally publish to the development app.
+        // Do not reintroduce SHOPIFY_FLAG_CLIENT_ID: an unlinked config is what
+        // caused that, and a flag that disagrees with the file would make the
+        // deploy target ambiguous again.
         withCredentials([
           string(credentialsId: 'shopify-app-automation-token', variable: 'SHOPIFY_APP_AUTOMATION_TOKEN'),
-          string(credentialsId: 'shopify-app-client-id', variable: 'SHOPIFY_FLAG_CLIENT_ID'),
           string(credentialsId: 'homexperia-target-url', variable: 'HOMEXPERIA_TARGET_URL')
         ]) {
           sh 'npm run build:extension'
           sh 'npm install -g @shopify/cli@latest'
+          // --config production names the tracked production config explicitly,
+          // so the release never falls back to an unqualified default.
           // --allow-updates is required because include_config_on_deploy is true,
           // so app configuration is published alongside the extension.
           sh """
-            shopify app deploy --allow-updates \
+            shopify app deploy --config production --allow-updates \
               --source-control-url "${env.GIT_URL ?: ''}"
           """
         }

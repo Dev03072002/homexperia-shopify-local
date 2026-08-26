@@ -6,7 +6,7 @@ import db from "./db.server";
  *
  * This replaces the manual Headless/Hydrogen channel setup: the token is
  * delegated the unauthenticated scopes granted to this app, which are declared
- * in shopify.app.toml.
+ * in shopify.app.production.toml.
  *
  * Shopify does not document whether a token's accessScopes is a snapshot taken
  * at creation or a live view of the app's current grants. Rather than depend on
