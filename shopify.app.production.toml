@@ -55,7 +55,6 @@ api_version = "2026-07"
 redirect_urls = [ "https://shopify.homexperia.com/auth/callback" ]
 
 [build]
-include_config_on_deploy = true
 
 # Critical for this file: it points at the REAL production app. If this were
 # true, running `shopify app dev --config production` would overwrite the
