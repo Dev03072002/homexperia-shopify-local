@@ -34,6 +34,22 @@
     endif
   endif
 
+  # Per-product opt-out. Exclusion-based on purpose: only an explicit true
+  # hides the widget, so a missing, blank or false metafield keeps the existing
+  # behaviour on every product that has never been touched.
+  #
+  # "$app" is the reserved prefix for this app's own namespace, declared as
+  # [product.metafields.app.hide_homexperia] in shopify.app.production.toml. No
+  # app or client ID is hardcoded. Liquid can read this regardless of any
+  # Storefront API access setting.
+  #
+  # The JS asset is loaded by the schema even when this block renders nothing,
+  # so the widget has to be told it is disabled rather than simply left without
+  # config - otherwise it would fall back to its defaults and still render.
+  if product.metafields["$app"].hide_homexperia.value == true
+    assign entries = entries | append: ',"enabled":false'
+  endif
+
   assign entries = entries | remove_first: ','
   assign homexperia_config = '{' | append: entries | append: '}'
 -%}

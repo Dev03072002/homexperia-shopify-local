@@ -276,6 +276,12 @@
 
     CONFIG = resolveConfig();
 
+    // Per-product opt-out, set by the app embed from the hide_homexperia
+    // metafield. Only an explicit false disables the widget, so a missing value
+    // leaves existing behaviour untouched. Returning here means no button, no
+    // modal and no listeners are created.
+    if (CONFIG.enabled === false) return;
+
     const btn = createButton();
     createModal();
 

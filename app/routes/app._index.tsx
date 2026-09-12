@@ -95,6 +95,15 @@ export default function Index() {
           the metafield.
         </s-paragraph>
       </s-section>
+
+      <s-section heading="Hiding Homexperia on a product">
+        <s-paragraph>
+          Homexperia shows on every product page by default. To hide it on one
+          product, open that product, find <s-text>Hide Homexperia</s-text> in
+          its metafields and turn it on. Leave it off, or untouched, to keep
+          showing Homexperia.
+        </s-paragraph>
+      </s-section>
     </s-page>
   );
 }

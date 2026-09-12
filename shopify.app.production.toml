@@ -14,9 +14,9 @@ application_url = "https://shopify.homexperia.com"
 embedded = true
 
 [access_scopes]
-# Must stay byte-identical to the tracked shopify.app.toml and to the SCOPES
-# runtime variable. app/shopify.server.ts splits SCOPES on "," without trimming.
-scopes = "unauthenticated_read_product_listings,unauthenticated_read_product_inventory,unauthenticated_read_product_tags,unauthenticated_read_product_pickup_locations,unauthenticated_read_metaobjects"
+# Must stay byte-identical to the SCOPES runtime variable.
+# app/shopify.server.ts splits SCOPES on "," without trimming.
+scopes = "write_products,unauthenticated_read_product_listings,unauthenticated_read_product_inventory,unauthenticated_read_product_tags,unauthenticated_read_product_pickup_locations,unauthenticated_read_metaobjects"
 
 [webhooks]
 # 2026-07 matches ApiVersion.July26 in app/shopify.server.ts. Keeping the
@@ -61,3 +61,22 @@ redirect_urls = [ "https://shopify.homexperia.com/auth/callback" ]
 # production application_url and redirect_urls with a temporary tunnel and break
 # OAuth for every installed merchant.
 automatically_update_urls_on_dev = false
+
+# Merchant-facing per-product switch to hide the storefront widget.
+#
+# Declared here so Shopify owns the definition: deploying the app creates it, and
+# no afterAuth/Admin API call is needed. The namespace is the reserved $app
+# prefix, so no app or client ID is hardcoded anywhere.
+#
+# Only the DEFINITION is created. No product values are written, so every
+# existing product stays unset and keeps showing the widget.
+#
+# access.admin = merchant_read_write lets merchants toggle it per product in the
+# Shopify admin. access.storefront is deliberately omitted: the theme app
+# extension reads this in Liquid, and Liquid can always read metafields
+# regardless of the Storefront API setting.
+[product.metafields.app.hide_homexperia]
+name = "Hide Homexperia"
+description = "Enable this to hide Homexperia Room Visualisation on this product."
+type = "boolean"
+access.admin = "merchant_read_write"
