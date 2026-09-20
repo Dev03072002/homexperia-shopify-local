@@ -1,16 +1,21 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 #
-# LOCAL ONLY — gitignored. Linked to the real Homexperia production Shopify app.
-# Use for interactive CLI work against production:
-#   shopify app config use production
+# The tracked production Shopify configuration, and the only config in this
+# repository. Controlled releases name it explicitly:
+#   shopify app deploy --config production
 #
-# Jenkins releases do NOT use this file. They use the tracked shopify.app.toml
-# with the Client ID supplied externally via SHOPIFY_FLAG_CLIENT_ID.
+# The production client_id below is committed on purpose. Shopify documents it
+# as the app's public identifier and a required field; leaving it out made the
+# CLI treat the config as unlinked and pull Dev Dashboard defaults over it at
+# release time. Do not reintroduce SHOPIFY_FLAG_CLIENT_ID.
+#
+# For local work use your own gitignored shopify.app.<name>.toml via
+# `shopify app config link`, then `shopify app config use <name>`.
 
 name = "Homexperia Room Visualisation"
 handle = "homexperia-room-visualisation"
 client_id = "3a2e564ef8597b0c509b6cb60d7b1954"
-application_url = "https://shopify.homexperia.com"
+application_url = "https://online.homexperia.com"
 embedded = true
 
 [access_scopes]
@@ -52,7 +57,7 @@ api_version = "2026-07"
 [auth]
 # Path matches authPathPrefix "/auth" in app/shopify.server.ts, served by the
 # splat route app/routes/auth.$.tsx.
-redirect_urls = [ "https://shopify.homexperia.com/auth/callback" ]
+redirect_urls = [ "https://online.homexperia.com/auth/callback" ]
 
 [build]
 

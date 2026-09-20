@@ -1,7 +1,7 @@
 // Homexperia Shopify app — production pipeline.
 //
 // Two independent outcomes:
-//   * Backend  -> Docker container on EC2, behind Nginx at shopify.homexperia.com
+//   * Backend  -> Docker container on EC2, behind Nginx at online.homexperia.com
 //   * Shopify  -> theme app extension / app version, published to Shopify
 //
 // A normal backend deployment NEVER publishes a Shopify app version. Publishing

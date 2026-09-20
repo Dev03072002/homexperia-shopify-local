@@ -13,7 +13,7 @@ Docker (host networking) on EC2
       ↓                    ↓
 PostgreSQL 127.0.0.1:5432  app on 127.0.0.1:3000
                                  ↓
-                           Nginx  →  https://shopify.homexperia.com
+                           Nginx  →  https://online.homexperia.com
 ```
 
 Jenkins is the only production deployment mechanism. GitHub Actions runs
@@ -65,7 +65,7 @@ Read from the code, not assumed.
 | Variable | Value | Source |
 | --- | --- | --- |
 | `SHOPIFY_API_KEY` | client ID | Shopify production app — **pending** |
-| `SHOPIFY_APP_URL` | `https://shopify.homexperia.com` | fixed |
+| `SHOPIFY_APP_URL` | `https://online.homexperia.com` | fixed |
 | `SCOPES` | must match `shopify.app.production.toml` | repository |
 | `NODE_ENV` | `production` | fixed |
 | `HOST` | `127.0.0.1` | fixed — see above |
@@ -136,7 +136,7 @@ withCredentials([
     trap 'rm -f "$TMP"' EXIT
     {
       echo "SHOPIFY_API_KEY=..."
-      echo "SHOPIFY_APP_URL=https://shopify.homexperia.com"
+      echo "SHOPIFY_APP_URL=https://online.homexperia.com"
       echo "SCOPES=..."
       echo "NODE_ENV=production"
       echo "HOST=127.0.0.1"
@@ -211,7 +211,7 @@ Prisma migrations are forward-only, so check the migration before relying on it.
 
 ## Handed to the AWS team
 
-- Nginx site for `shopify.homexperia.com` proxying to `http://127.0.0.1:3000`.
+- Nginx site for `online.homexperia.com` proxying to `http://127.0.0.1:3000`.
   Do not modify the existing `cms.homexperia.com` site.
 - TLS via Certbot for the new host.
 - How the Deploy stage reaches EC2: run the job on an agent on the host, or wrap
