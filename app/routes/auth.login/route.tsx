@@ -1,48 +1,39 @@
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
-import { useState } from "react";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { Form, useActionData, useLoaderData } from "react-router";
+import type { LoaderFunctionArgs } from "react-router";
 
 import { login } from "../../shopify.server";
-import { loginErrorMessage } from "./error.server";
 
+/**
+ * Login route without a shop-domain form.
+ *
+ * App Store requirement 2.3.1 prohibits asking merchants to type a shop domain
+ * during installation or configuration, so no form is rendered here.
+ *
+ * The route itself is kept rather than deleted, for two reasons:
+ *   - login() still completes authentication when a Shopify-owned surface
+ *     sends a shop parameter, so legitimate entry keeps working.
+ *   - Without this file, /auth/login would fall through to the auth.$ splat,
+ *     which calls authenticate.admin(). The library explicitly rejects that
+ *     from the configured login path and throws a 500.
+ */
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const errors = loginErrorMessage(await login(request));
+  // Throws a redirect into authentication when a shop parameter is present.
+  // Otherwise it returns errors, which are deliberately not surfaced as a
+  // form the merchant could type into.
+  await login(request);
 
-  return { errors };
-};
-
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const errors = loginErrorMessage(await login(request));
-
-  return {
-    errors,
-  };
+  return null;
 };
 
 export default function Auth() {
-  const loaderData = useLoaderData<typeof loader>();
-  const actionData = useActionData<typeof action>();
-  const [shop, setShop] = useState("");
-  const { errors } = actionData || loaderData;
-
   return (
     <AppProvider embedded={false}>
       <s-page>
-        <Form method="post">
-        <s-section heading="Log in">
-          <s-text-field
-            name="shop"
-            label="Shop domain"
-            details="example.myshopify.com"
-            value={shop}
-            onChange={(e) => setShop(e.currentTarget.value)}
-            autocomplete="on"
-            error={errors.shop}
-          ></s-text-field>
-          <s-button type="submit">Log in</s-button>
+        <s-section heading="Homexperia Room Visualisation">
+          <s-paragraph>
+            Open Homexperia from your Shopify admin to manage the app.
+          </s-paragraph>
         </s-section>
-        </Form>
       </s-page>
     </AppProvider>
   );
